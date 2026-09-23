@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340" viewBox="0 150 1200 340" fill="none">
+  <title>Croqui do galpão</title>
+  <desc>Planta esquemática com duas prateleiras alinhadas à esquerda, corredor central e acessos nas duas extremidades.</desc>
+  <defs>
+    <pattern id="wall-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="6" height="6" fill="#edf1f6"/>
+      <path d="M0 0v6" stroke="#b8c5d4" stroke-width="1"/>
+    </pattern>
+    <pattern id="rack-bays" x="120" y="234" width="75" height="30" patternUnits="userSpaceOnUse">
+      <rect width="75" height="30" fill="#f1f5fa"/>
+      <path d="M0 0v30M37.5 0v30" stroke="#5c7b9b" stroke-width=".8"/>
+      <path d="M4 4h29.5v22H4zm37.5 0H71v22H41.5" stroke="#9aafc4" stroke-width=".65"/>
+    </pattern>
+  </defs>
+  <rect x="0" y="150" width="1200" height="340" fill="#fbfcfe"/>
+  <g stroke-linecap="square" stroke-linejoin="miter">
+    <!-- Paredes em corte, com hachura e espessura de linha hierarquizada. -->
+    <path d="M100 280V220H1100V280H1092V228H108V280ZM100 360V420H1100V360H1092V412H108V360Z" fill="url(#wall-hatch)" stroke="#344b64" stroke-width="1.8"/>
+    <path d="M100 280V220H1100V280M100 360V420H1100V360" stroke="#263e59" stroke-width="2.4"/>
+    <g fill="#536a82">
+      <rect x="100" y="220" width="9" height="9"/><rect x="1091" y="220" width="9" height="9"/>
+      <rect x="100" y="411" width="9" height="9"/><rect x="1091" y="411" width="9" height="9"/>
+    </g>
+    <!-- Estantes modulares; as duas começam junto à extremidade esquerda. -->
+    <rect x="120" y="234" width="600" height="30" fill="url(#rack-bays)" stroke="#345d87" stroke-width="1.4"/>
+    <g transform="translate(0 142)">
+      <rect x="120" y="234" width="600" height="30" fill="url(#rack-bays)" stroke="#345d87" stroke-width="1.4"/>
+    </g>
+    <path d="M120 238h600m-600 22h600m-600 120h600m-600 22h600" stroke="#7893ae" stroke-width=".55"/>
+    <!-- Projeção dos portões e indicação discreta da circulação. -->
+    <path d="M100 280v80m1000-80v80" stroke="#8397ac" stroke-width=".85" stroke-dasharray="4 3"/>
+    <path d="M96 280h12m-12 80h12m984-80h12m-12 80h12" stroke="#344b64" stroke-width="1.5"/>
+    <path d="M108 283v74m984-74v74" stroke="#b0bfce" stroke-width=".6"/>
+    <path d="M150 320h900" stroke="#aab9ca" stroke-width=".7" stroke-dasharray="14 5 2 5"/>
+    <path d="M56 320h64m-7-5 7 5-7 5m967-5h64m-7-5 7 5-7 5" stroke="#627e9b" stroke-width="1"/>
+  </g>
+</svg>
