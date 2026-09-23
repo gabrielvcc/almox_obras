@@ -144,14 +144,15 @@ try:
       window.check = (value, message) => { if (!value) throw Error(message); };
       window.until = async fn => { for(let i=0;i<200;i++){if(fn()) return; await new Promise(r=>setTimeout(r,25));} throw Error('Timeout: '+fn); };
       window.save = async () => { q('#save-item').click(); await until(()=>!q('#item-dialog').open); };
+      window.selectShelf = index => {q('#shelf-filter').selectedIndex=index+1; q('#shelf-filter').dispatchEvent(new Event('change'));};
       window.openSlot = (row, pos) => q('[data-row="'+row+'"][data-position="'+pos+'"]').click();
       window.setFile = (selector, text, name, type) => {const transfer=new DataTransfer(); transfer.items.add(new File([text],name,{type})); q(selector).files=transfer.files; q(selector).dispatchEvent(new Event('change',{bubbles:true}));};
       window.png = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='), c=>c.charCodeAt(0));
     """
     client.evaluate(helper)
-    client.evaluate("(async()=>{await until(()=>document.querySelectorAll('.slot').length===64);check(q('#occupied-count').textContent==='0','Estoque inicial vazio');check(q('#storage-warning').hidden,'IndexedDB disponível');})()")
+    client.evaluate("(async()=>{await until(()=>document.querySelectorAll('.slot').length===96);check(q('#occupied-count').textContent==='0','Estoque inicial vazio');check(q('#storage-warning').hidden,'IndexedDB disponível');})()")
     client.screenshot("desktop-empty.png")
-    print("OK: inicialização e 64 posições.", flush=True)
+    print("OK: inicialização e 96 posições.", flush=True)
     client.evaluate("""(async()=>{
       q('#warehouse-nav').click();
       await until(()=>q('.warehouse-plan-image').complete&&q('.warehouse-plan-image').naturalWidth>0);
@@ -173,7 +174,7 @@ try:
       q('input[name=span][value="2"]').click();
       setFile('#item-photo',png,'foto.png','image/png');await until(()=>!q('#item-photo-preview').hidden&&!q('#save-item').disabled);
       await save();check(q('#occupied-count').textContent==='2','Item grande ocupa duas posições');
-      check(document.querySelectorAll('.slot').length===63,'Par unificado');check(q('.slot.full').textContent.includes('A1 + A2'),'Par correto ao clicar em A2');
+      check(document.querySelectorAll('.slot').length===95,'Par unificado');check(q('.slot.full').textContent.includes('A1 + A2'),'Par correto ao clicar em A2');
       openSlot('A',1);check(q('#item-quantity').value==='5','Quantidade salva');check(!q('#item-photo-preview').hidden,'Foto salva');q('[data-close="item-dialog"]').click();
     })()""")
     client.screenshot("desktop-item.png")
@@ -196,22 +197,46 @@ try:
       q('#warehouse-add').click();q('#shelf-name').value='Prateleira esquerda';q('#shelf-form button[type=submit]').click();
       await until(()=>!q('#shelf-dialog').open);check(document.querySelectorAll('.hotspot').length===2,'Duas prateleiras no galpão');
       document.querySelectorAll('#warehouse-cards [data-shelf]')[1].click();check(q('#item-count').textContent==='0','Prateleiras independentes');
-      q('#edit-shelf').click();q('#zone-x').value='90';q('#zone-w').value='25';q('#shelf-form button[type=submit]').click();
+      q('.shelf-edit').click();q('#zone-x').value='90';q('#zone-w').value='25';q('#shelf-form button[type=submit]').click();
       await until(()=>q('#shelf-error').textContent.length>0);check(q('#shelf-dialog').open,'Área inválida não salva');
       q('#zone-x').value='6';q('#shelf-form button[type=submit]').click();await until(()=>!q('#shelf-dialog').open);
     })()""")
     print("OK: foto real, múltiplas prateleiras e validação das áreas clicáveis.", flush=True)
     client.evaluate("""(async()=>{
+      q('#shelves-nav').click();
+      check(q('#shelf-filter').value==='all','Todas por padrão');
+      check(document.querySelectorAll('.shelf-board').length===2,'Prateleiras na mesma página');
+      check(document.querySelectorAll('.slot').length===192,'96 posições em cada prateleira');
+      const boards=[...document.querySelectorAll('.shelf-board')];
+      check(boards[1].getBoundingClientRect().left>boards[0].getBoundingClientRect().right,'Mapas lado a lado');
+      const last=boards[1].querySelector('[data-row="A"][data-position="24"]');
+      check(last.textContent.includes('A48'),'Numeração contínua na segunda prateleira');
+      last.click();check(q('#item-dialog-title').textContent==='Posição A48','Cadastro usa endereço global');
+      q('#item-name').value='Teste limite';q('input[name=span][value="2"]').click();await save();
+      const large=document.querySelectorAll('.shelf-board')[1].querySelector('.slot.full');
+      check(large.textContent.includes('A47 + A48'),'Último par correto');
+      large.click();q('#delete-item').click();await until(()=>q('#confirm-dialog').open);q('#confirm-accept').click();await until(()=>!q('#item-dialog').open);
+      selectShelf(1);check(document.querySelectorAll('.shelf-board').length===1,'Filtro por prateleira');
+      check(q('.slot').textContent.includes('A25'),'Filtro preserva início em A25');
+      q('#search').value='A48';q('#search').dispatchEvent(new Event('input'));check(document.querySelectorAll('.slot.matched').length===1,'Busca pelo endereço contínuo');
+      q('#shelves-nav').click();
+    })()""")
+    client.screenshot("shelves-all.png")
+    client.evaluate("selectShelf(1);")
+    client.screenshot("shelves-filtered.png")
+    print("OK: página única, 12 módulos, numeração contínua, filtro e último módulo.", flush=True)
+
+    client.evaluate("""(async()=>{
       openSlot('C',8);q('#item-name').value='Cone';q('#item-quantity').value='8';q('#item-asset').value='P-02';await save();
-      document.querySelector('#shelf-nav [data-shelf]').click();
+      selectShelf(0);
       openSlot('A',2);q('#item-name').value='Cone';q('#item-quantity').value='5';q('#item-asset').value='P-01';await save();
       q('#items-nav').click();check(!q('#items-view').hidden,'Consulta de itens acessível');
       window.coneGroup=()=>[...document.querySelectorAll('.item-group')].find(group=>group.querySelector('.catalog-name strong').textContent==='Cone');
       check(coneGroup().querySelector('.catalog-total strong').textContent==='13 un','Total agrupado correto');
-      check(coneGroup().textContent.includes('A2')&&coneGroup().textContent.includes('C8'),'Localizações preservadas');
+      check(coneGroup().textContent.includes('A2')&&coneGroup().textContent.includes('C32'),'Localizações preservadas');
       check(coneGroup().textContent.includes('P-01')&&coneGroup().textContent.includes('P-02'),'Patrimônios preservados');
       check(document.querySelector('.catalog-photo img'),'Foto aparece na consulta');
-      q('#catalog-search').value='P-02';q('#catalog-search').dispatchEvent(new Event('input'));
+      q('#catalog-search').value='C32';q('#catalog-search').dispatchEvent(new Event('input'));
       check(document.querySelectorAll('.item-group').length===1,'Busca por patrimônio');
       check(coneGroup().querySelectorAll('li').length===2,'Busca mantém todas as localizações e o total');
       q('#catalog-search').value='inexistente';q('#catalog-search').dispatchEvent(new Event('input'));

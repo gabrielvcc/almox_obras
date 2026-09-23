@@ -2,6 +2,7 @@
 (function (root) {
   "use strict";
   const ROWS = ["A", "B", "C", "D"];
+  const MODULES = 12, POSITIONS = MODULES * 2, CAPACITY = ROWS.length * POSITIONS;
   const UNITS = ["un", "sc", "cx", "kg", "m", "L", "pc"];
   const clone = value => JSON.parse(JSON.stringify(value));
   const uid = () => globalThis.crypto?.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -27,7 +28,7 @@
   }
   function placeItem(shelf, candidate) {
     ensure(ROWS.includes(candidate.row), "Andar inválido.");
-    ensure(Number.isInteger(candidate.start) && candidate.start >= 1 && candidate.start <= 16, "Posição inválida.");
+    ensure(Number.isInteger(candidate.start) && candidate.start >= 1 && candidate.start <= POSITIONS, "Posição inválida.");
     ensure(candidate.span === 1 || candidate.span === 2, "Tamanho do item inválido.");
     ensure(candidate.span !== 2 || candidate.start % 2 === 1, "Um módulo inteiro deve começar na primeira posição do par.");
     const collision = shelf.items.some(item => item.id !== candidate.id && item.row === candidate.row && candidate.start < item.start + item.span && item.start < candidate.start + candidate.span);
@@ -43,7 +44,7 @@
       ensure(original && typeof original === "object", "Prateleira inválida.");
       const shelf = {id: bounded(original.id, 100, "Identificador", true), name: bounded(original.name, 60, "Nome da prateleira", true), zone: validateZone(original.zone), items: []};
       ensure(!ids.has(shelf.id), "Há identificadores duplicados no backup."); ids.add(shelf.id);
-      ensure(Array.isArray(original.items) && original.items.length <= 64, "Lista de itens inválida.");
+      ensure(Array.isArray(original.items) && original.items.length <= CAPACITY, "Lista de itens inválida.");
       for (const value of original.items) {
         ensure(value && typeof value === "object", "Item inválido.");
         const item = {id: bounded(value.id, 100, "Identificador do item", true), row: value.row, start: value.start, span: value.span, name: bounded(value.name, 120, "Nome do item", true), quantity: value.quantity, unit: value.unit, asset: bounded(value.asset || "", 100, "Patrimônio"), notes: bounded(value.notes || "", 2000, "Observações"), photo: photo(value.photo || ""), updatedAt: bounded(value.updatedAt || "", 100, "Data")};
@@ -55,6 +56,15 @@
       state.shelves.push(shelf);
     }
     return state;
+  }
+  function positionNumber(state, shelfId, position) {
+    const index = state.shelves.findIndex(shelf => shelf.id === shelfId);
+    ensure(index >= 0, "Prateleira não encontrada.");
+    return index * POSITIONS + position;
+  }
+  function positionLabel(state, shelfId, row, position, span = 1) {
+    const first = positionNumber(state, shelfId, position);
+    return row + first + (span === 2 ? " + " + row + (first + 1) : "");
   }
   function catalog(state) {
     const groups = new Map();
@@ -76,7 +86,7 @@
       return group;
     }).sort((a, b) => a.name.localeCompare(b.name, "pt-BR") || a.unit.localeCompare(b.unit));
   }
-  const api = {ROWS, UNITS, clone, uid, pairStart, at, used, defaultState, validateZone, placeItem, validateState, catalog};
+  const api = {ROWS, MODULES, POSITIONS, CAPACITY, positionNumber, positionLabel, UNITS, clone, uid, pairStart, at, used, defaultState, validateZone, placeItem, validateState, catalog};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Inventory = api;
 })(globalThis);

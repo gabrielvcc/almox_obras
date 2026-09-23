@@ -95,3 +95,27 @@ dialog{border:0;color:var(--ink);padding:0;background:#fff;box-shadow:0 15px 80p
 .plan-shelf:hover .plan-label,.plan-shelf:focus-visible .plan-label{background:#eaf1f9;border-color:#7597ba}
 .warehouse-scroll.is-plan .hotspot.plan-shelf{border-radius:0}
 @media(max-width:850px){.plan-label{min-width:212px}}
+
+/* Prateleiras em sequência; cada mapa mantém sua largura e seus endereços. */
+#shelves-mobile{display:none}
+.shelf-filter-bar{display:flex;align-items:center;gap:12px;padding:18px 25px 0}
+.shelf-filter-bar label{font-size:11px;font-weight:600;color:#61758c}
+.shelf-filter-bar select{min-width:210px;max-width:350px;padding:9px 32px 9px 12px;border:1px solid #d8e1eb;background:#f8fafd;border-radius:6px;color:#345776;font-size:12px}
+#shelf-range{font-size:10px;color:#8294a8;margin-left:auto}
+.shelves-scroll{padding-top:0;scrollbar-color:#9eb5ce #edf2f8;scrollbar-width:auto}
+.shelves-strip{display:flex;align-items:flex-start;gap:28px;width:max-content;min-width:100%}
+.shelf-board{width:1000px;min-width:1000px;flex:1 0 1000px;padding:0 8px}
+.shelf-board-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:12px;padding:16px 0;border-bottom:1px solid #e1e7ef}
+.shelf-board-heading h3{font-size:14px;margin:0;color:#345776}
+.shelf-board-heading p{font-size:10px;color:#8294a8;margin:5px 0 0}
+.shelf-board-heading .button{font-size:10px;padding:8px 11px;min-height:33px}
+.shelf-board .module-headings,.shelf-board .rack-floor{grid-template-columns:40px repeat(12,minmax(0,1fr));gap:8px}
+.shelf-board .module-headings span{font-size:7px;letter-spacing:.2px}
+.shelf-board .slot .slot-code{font-size:10px}
+.shelf-board .slot.full .slot-code{font-size:9px}
+.shelf-board .rack-base{margin-left:48px}
+.shelf-board .rack-floor{padding:12px 0 15px}
+@media(max-width:850px){#shelves-mobile{display:flex}}
+@media(max-width:550px){.shelf-filter-bar{padding:16px 15px 0;flex-wrap:wrap;gap:8px}.shelf-filter-bar select{min-width:0;flex:1;max-width:100%}#shelf-range{flex-basis:100%;margin-left:0;font-size:9px}.shelves-strip{gap:20px}.shelf-board{padding:0 3px}}
+
+

@@ -3,10 +3,10 @@ const test = (name, run) => { run(); console.log("OK: " + name); };
 const assert = require("node:assert/strict");
 const M = require("../inventory.js");
 const item = (values = {}) => ({id: "item-1", row: "A", start: 1, span: 1, name: "Cimento CP-2", quantity: 5, unit: "sc", asset: "PAT-001", notes: "", photo: "", updatedAt: "2026-09-23", ...values});
-test("uma prateleira começa com 64 posições livres", () => {
+test("uma prateleira começa com 96 posições livres", () => {
   const state = M.defaultState();
   assert.equal(M.used(state.shelves[0]), 0);
-  for (const row of M.ROWS) for (let position = 1; position <= 16; position++) assert.equal(M.at(state.shelves[0], row, position), undefined);
+  for (const row of M.ROWS) for (let position = 1; position <= M.POSITIONS; position++) assert.equal(M.at(state.shelves[0], row, position), undefined);
 });
 test("item grande reserva o par e ambas as posições apontam ao mesmo cadastro", () => {
   const shelf = M.defaultState().shelves[0];
@@ -24,7 +24,7 @@ test("não permite sobreposição, inclusive ao ampliar um item existente", () =
 test("módulos inteiros não atravessam pares nem saem da prateleira", () => {
   const shelf = M.defaultState().shelves[0];
   assert.throws(() => M.placeItem(shelf, item({start: 2, span: 2})), /primeira/);
-  assert.throws(() => M.placeItem(shelf, item({start: 17})), /Posição/);
+  assert.throws(() => M.placeItem(shelf, item({start: 25})), /Posição/);
   assert.throws(() => M.placeItem(shelf, item({row: "E"})), /Andar/);
 });
 test("backup conserva prateleiras, fotos, campos e posições ocupadas", () => {
@@ -85,5 +85,27 @@ test("totais fracionários e agrupamento refletem edições e exclusões", () =>
   assert.equal(M.catalog(state).length, 2);
   shelf.items.pop();
   assert.equal(M.catalog(state)[0].total, 0.1);
+});
+
+
+test("numeração contínua cobre todos os andares e não depende do filtro", () => {
+  const state = M.defaultState(), first = state.shelves[0];
+  state.shelves.push({id: "second", name: "Segunda", items: []}, {id: "third", name: "Terceira", items: []});
+  assert.equal(M.CAPACITY, 96);
+  assert.equal(M.positionLabel(state, first.id, "A", 24), "A24");
+  assert.equal(M.positionLabel(state, "second", "A", 1), "A25");
+  assert.equal(M.positionLabel(state, "second", "C", 8), "C32");
+  assert.equal(M.positionLabel(state, "second", "D", 23, 2), "D47 + D48");
+  assert.equal(M.positionLabel(state, "third", "B", 1), "B49");
+});
+test("ampliação preserva cadastros antigos e aceita o último par de 12 módulos", () => {
+  const state = M.defaultState(), shelf = state.shelves[0];
+  shelf.items.push(item({start: 16}));
+  const restored = M.validateState(M.clone(state));
+  assert.deepEqual(restored.shelves[0].items[0], shelf.items[0]);
+  restored.shelves[0].items.push(item({id: "new", start: 23, span: 2}));
+  assert.doesNotThrow(() => M.validateState(restored));
+  assert.throws(() => M.placeItem(shelf, item({id: "bad", start: 24, span: 2})), /primeira/);
+  assert.throws(() => M.placeItem(shelf, item({id: "bad", start: 25})), /Posição/);
 });
 

@@ -6,7 +6,7 @@
   const $$ = selector => [...document.querySelectorAll(selector)];
   const esc = value => String(value).replace(/[&<>"']/g, character => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[character]));
   const icon = name => '<svg aria-hidden="true"><use href="#i-' + name + '"/></svg>';
-  let state, db, revision = 0, activeShelf, view = "shelf", filter = "all";
+  let state, db, revision = 0, activeShelf, view = "shelf", filter = "all", shelfFilter = "all";
   let itemContext = null, shelfContext = null, pendingPhoto = "", photoLoading = false, photoSequence = 0, toastTimer, saving = false;
   const imageTypes = ["image/jpeg", "image/png", "image/webp"];
   const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("almox-updates") : null;
@@ -75,53 +75,67 @@
       if (message) toast(message + (db ? "" : " As alterações serão perdidas ao fechar esta página."));
     } finally { saving = false; }
   }
-  function currentShelf() { return state.shelves.find(shelf => shelf.id === activeShelf) || state.shelves[0]; }
   function shelfIn(next, id) { return next.shelves.find(shelf => shelf.id === id); }
-  function showShelf(id) {
-    activeShelf = id; view = "shelf"; $("#search").value = ""; filter = "all"; render();
+  function selectedShelves() {
+    return shelfFilter === "all" ? state.shelves : state.shelves.filter(shelf => shelf.id === shelfFilter);
+  }
+  function showShelf(id = "all") {
+    shelfFilter = id;
+    if (id !== "all") activeShelf = id;
+    view = "shelf"; $("#search").value = ""; filter = "all"; render();
   }
   function render() {
-    const shelf = currentShelf();
+    if (shelfFilter !== "all" && !state.shelves.some(shelf => shelf.id === shelfFilter)) shelfFilter = "all";
     $("#shelf-view").hidden = view !== "shelf"; $("#warehouse-view").hidden = view !== "warehouse"; $("#items-view").hidden = view !== "items";
-    $("#items-nav").classList.toggle("active", view === "items");
-    $("#items-nav").setAttribute("aria-current", view === "items" ? "page" : "false");
-    $("#warehouse-nav").classList.toggle("active", view === "warehouse");
-    $("#breadcrumb-current").textContent = view === "items" ? "Itens" : view === "warehouse" ? "Visão do galpão" : shelf.name;
-    $("#shelf-title").textContent = shelf.name;
-    document.title = (view === "items" ? "Itens" : view === "warehouse" ? "Meu galpão" : shelf.name) + " · Almox";
-    $("#shelf-nav").innerHTML = '<button id="warehouse-mobile" class="nav-button" style="display:none" title="Visão do galpão" aria-label="Visão do galpão">' + icon("grid") + '</button><button id="items-mobile" class="nav-button ' + (view === "items" ? "active" : "") + '" title="Itens">' + icon("box") + 'Itens</button>' + state.shelves.map(item => '<button class="nav-button ' + (view === "shelf" && item.id === shelf.id ? "active" : "") + '" data-shelf="' + esc(item.id) + '"' + (view === "shelf" && item.id === shelf.id ? ' aria-current="page"' : "") + '>' + icon("shelf") + '<span class="nav-name">' + esc(item.name) + '</span><span class="nav-count">' + item.items.length + '</span></button>').join("");
-    $("#warehouse-mobile").addEventListener("click", showWarehouse);
-    $("#items-mobile").onclick = showItems;
+    for (const [id, page] of [["items-nav", "items"], ["warehouse-nav", "warehouse"], ["shelves-nav", "shelf"]]) {
+      $("#" + id).classList.toggle("active", view === page);
+      $("#" + id).setAttribute("aria-current", view === page ? "page" : "false");
+    }
+    const title = view === "items" ? "Itens" : view === "warehouse" ? "Meu galpão" : "Prateleiras";
+    $("#breadcrumb-current").textContent = title; $("#shelf-title").textContent = "Prateleiras";
+    document.title = title + " · Almox";
+    $("#shelf-nav").innerHTML = '<button id="warehouse-mobile" class="nav-button" style="display:none" title="Visão do galpão" aria-label="Visão do galpão">' + icon("grid") + '</button><button id="items-mobile" class="nav-button ' + (view === "items" ? "active" : "") + '">' + icon("box") + 'Itens</button><button id="shelves-mobile" class="nav-button ' + (view === "shelf" ? "active" : "") + '">' + icon("shelf") + 'Prateleiras</button>';
+    $("#warehouse-mobile").onclick = showWarehouse; $("#items-mobile").onclick = showItems;
+    $("#shelves-mobile").onclick = () => showShelf();
     $("#item-names").innerHTML = [...new Set(state.shelves.flatMap(shelf => shelf.items.map(item => item.name)))].map(name => '<option value="' + esc(name) + '"></option>').join("");
-    const occupied = M.used(shelf);
-    $("#occupied-count").textContent = occupied; $("#available-count").textContent = 64 - occupied;
-    $("#item-count").textContent = shelf.items.length; $("#occupancy-percent").textContent = Math.round(occupied / 64 * 100) + "%";
-    $("#capacity-label").textContent = occupied + " de 64"; $("#capacity-bar").style.width = occupied / 64 * 100 + "%";
+    $("#shelf-filter").innerHTML = '<option value="all">Todas</option>' + state.shelves.map(shelf => '<option value="' + esc(shelf.id) + '">' + esc(shelf.name) + '</option>').join("");
+    $("#shelf-filter").value = shelfFilter;
+    const shelves = selectedShelves(), occupied = shelves.reduce((sum, shelf) => sum + M.used(shelf), 0), capacity = shelves.length * M.CAPACITY;
+    $("#occupied-count").textContent = occupied; $("#available-count").textContent = capacity - occupied;
+    $("#total-capacity").textContent = "/ " + capacity;
+    $("#item-count").textContent = shelves.reduce((sum, shelf) => sum + shelf.items.length, 0);
+    $("#occupancy-percent").textContent = Math.round(occupied / capacity * 100) + "%";
+    $("#capacity-label").textContent = occupied + " de " + capacity; $("#capacity-bar").style.width = occupied / capacity * 100 + "%";
+    $("#shelf-range").textContent = shelves.length > 1 ? shelves.length + " prateleiras · deslize para ver todas" : "Posições " + M.positionNumber(state, shelves[0].id, 1) + " a " + M.positionNumber(state, shelves[0].id, M.POSITIONS);
     renderMap(); if (view === "warehouse") renderWarehouse(); if (view === "items") renderCatalog();
   }
   function normalized(value) { return String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim(); }
   function renderMap() {
-    const shelf = currentShelf(), query = normalized($("#search").value);
+    const query = normalized($("#search").value);
     let matches = 0;
-    $("#rack").innerHTML = M.ROWS.map((row, rowIndex) => {
-      let modules = "";
-      for (let moduleIndex = 0; moduleIndex < 8; moduleIndex++) {
-        let slots = "";
-        const first = moduleIndex * 2 + 1;
-        for (let position = first; position <= first + 1; position++) {
-          const item = M.at(shelf, row, position);
-          if (item?.span === 2 && item.start !== position) continue;
-          const code = row + position, full = item?.span === 2;
-          const codes = full ? code + " + " + row + (position + 1) : code;
-          const searchText = normalized([codes, item?.name || "", item?.asset || "", item?.notes || ""].join(" "));
-          const visible = (!query || searchText.includes(query)) && (filter === "all" || (filter === "occupied" ? !!item : !item));
-          if (visible) matches += full ? 2 : 1;
-          const label = item ? codes + ": " + item.name + ", " + item.quantity + " " + item.unit + ". Clique para editar." : code + ": livre. Clique para cadastrar.";
-          slots += '<button class="slot ' + (item ? "occupied " : "") + (full ? "full " : "") + (!visible ? "dimmed " : query ? "matched " : "") + '" data-row="' + row + '" data-position="' + position + '" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="slot-code">' + codes + '</span><span class="slot-bottom">' + (full ? esc(item.name) : item ? '<svg class="mini-icon" aria-hidden="true"><use href="#i-box"/></svg>' : "+") + '</span></button>';
+    $("#rack").innerHTML = selectedShelves().map(shelf => {
+      const offset = M.positionNumber(state, shelf.id, 1) - 1;
+      const headings = '<div class="module-headings"><span>ANDAR</span>' + Array.from({length: M.MODULES}, (_, index) => '<span>MÓDULO ' + String(offset / 2 + index + 1).padStart(2, "0") + '</span>').join("") + '</div>';
+      const floors = M.ROWS.map((row, rowIndex) => {
+        let modules = "";
+        for (let moduleIndex = 0; moduleIndex < M.MODULES; moduleIndex++) {
+          let slots = "";
+          const first = moduleIndex * 2 + 1;
+          for (let position = first; position <= first + 1; position++) {
+            const item = M.at(shelf, row, position);
+            if (item?.span === 2 && item.start !== position) continue;
+            const full = item?.span === 2, codes = M.positionLabel(state, shelf.id, row, position, full ? 2 : 1);
+            const searchText = normalized([codes, shelf.name, item?.name || "", item?.asset || "", item?.notes || ""].join(" "));
+            const visible = (!query || searchText.includes(query)) && (filter === "all" || (filter === "occupied" ? !!item : !item));
+            if (visible) matches += full ? 2 : 1;
+            const label = item ? codes + ": " + item.name + ", " + item.quantity + " " + item.unit + ". Clique para editar." : codes + ": livre. Clique para cadastrar.";
+            slots += '<button class="slot ' + (item ? "occupied " : "") + (full ? "full " : "") + (!visible ? "dimmed " : query ? "matched " : "") + '" data-shelf-id="' + esc(shelf.id) + '" data-row="' + row + '" data-position="' + position + '" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="slot-code">' + codes + '</span><span class="slot-bottom">' + (full ? esc(item.name) : item ? '<svg class="mini-icon" aria-hidden="true"><use href="#i-box"/></svg>' : "+") + '</span></button>';
+          }
+          modules += '<div class="module" aria-label="Módulo ' + (offset / 2 + moduleIndex + 1) + '">' + slots + "</div>";
         }
-        modules += '<div class="module" aria-label="Módulo ' + (moduleIndex + 1) + '">' + slots + "</div>";
-      }
-      return '<div class="rack-floor"><div class="floor-label"><strong>' + row + "</strong><small>" + (4 - rowIndex) + "º andar</small></div>" + modules + "</div>";
+        return '<div class="rack-floor"><div class="floor-label"><strong>' + row + "</strong><small>" + (4 - rowIndex) + "º andar</small></div>" + modules + "</div>";
+      }).join("");
+      return '<article class="shelf-board" data-board="' + esc(shelf.id) + '" aria-label="' + esc(shelf.name) + '"><header class="shelf-board-heading"><div><h3>' + esc(shelf.name) + '</h3><p>Posições ' + (offset + 1) + '–' + (offset + M.POSITIONS) + '</p></div><button class="button secondary shelf-edit" data-edit-shelf="' + esc(shelf.id) + '">' + icon("edit") + 'Editar prateleira</button></header>' + headings + floors + '<div class="rack-base"><span></span><span></span></div></article>';
     }).join("");
     $$(".segmented button").forEach(button => { button.classList.toggle("selected", button.dataset.filter === filter); button.setAttribute("aria-pressed", button.dataset.filter === filter); });
     $("#search-feedback").textContent = query || filter !== "all" ? (matches ? matches + " posições correspondem à busca. As demais aparecem esmaecidas." : "Nenhuma posição corresponde à busca. Tente outro termo ou filtro.") : "";
@@ -129,7 +143,7 @@
   function showItems() { view = "items"; render(); }
   function renderCatalog() {
     const groups = M.catalog(state), query = normalized($("#catalog-search").value);
-    const position = location => location.row + location.start + (location.span === 2 ? " + " + location.row + (location.start + 1) : "");
+    const position = location => M.positionLabel(state, location.shelfId, location.row, location.start, location.span);
     const visible = groups.filter(group => normalized([group.name, ...group.locations.map(location => [location.shelfName, location.asset, position(location)].join(" "))].join(" ")).includes(query));
     const number = value => new Intl.NumberFormat("pt-BR", {maximumFractionDigits: 10}).format(value);
     const quantity = (value, unit) => number(value) + " " + (unit === "pc" ? "pç" : unit);
@@ -151,7 +165,7 @@
     $("#change-photo").innerHTML = icon("photo") + (hasPhoto ? "Trocar foto" : "Usar foto do galpão");
     $("#warehouse-scroll").classList.toggle("is-plan", !hasPhoto);
     if (hasPhoto) {
-      $("#hotspots").innerHTML = state.shelves.map(shelf => '<button class="hotspot" data-shelf="' + esc(shelf.id) + '" style="left:' + shelf.zone.x + "%;top:" + shelf.zone.y + "%;width:" + shelf.zone.w + "%;height:" + shelf.zone.h + '%" aria-label="Abrir ' + esc(shelf.name) + '"><strong>' + esc(shelf.name) + '</strong><small>' + shelf.items.length + " itens · " + (64 - M.used(shelf)) + " livres</small></button>").join("");
+      $("#hotspots").innerHTML = state.shelves.map(shelf => '<button class="hotspot" data-shelf="' + esc(shelf.id) + '" style="left:' + shelf.zone.x + "%;top:" + shelf.zone.y + "%;width:" + shelf.zone.w + "%;height:" + shelf.zone.h + '%" aria-label="Abrir ' + esc(shelf.name) + '"><strong>' + esc(shelf.name) + '</strong><small>' + shelf.items.length + " itens · " + (M.CAPACITY - M.used(shelf)) + " livres</small></button>").join("");
     } else {
       const right = state.shelves.find(shelf => normalized(shelf.name).includes("direita")) || state.shelves.find(shelf => !normalized(shelf.name).includes("esquerda"));
       const left = state.shelves.find(shelf => shelf.id !== right?.id && normalized(shelf.name).includes("esquerda")) || state.shelves.find(shelf => shelf.id !== right?.id);
@@ -161,7 +175,7 @@
         return '<button class="hotspot plan-shelf plan-' + css + (shelf ? "" : " unassigned") + '" ' + (shelf ? 'data-shelf="' + esc(shelf.id) : 'data-plan-add="' + side) + '" style="left:10%;top:' + y + '%;width:50%;height:8.824%" aria-label="' + (shelf ? "Abrir " : "Cadastrar ") + esc(title) + '"><span class="plan-label"><span><strong>' + esc(title) + '</strong><small>' + detail + '</small></span>' + icon(shelf ? "arrow" : "plus") + '</span></button>';
       }).join("");
     }
-    $("#warehouse-cards").innerHTML = state.shelves.map(shelf => '<button class="warehouse-card" data-shelf="' + esc(shelf.id) + '">' + icon("shelf") + "<span><strong>" + esc(shelf.name) + "</strong><small>" + M.used(shelf) + " de 64 posições ocupadas</small></span>" + icon("arrow") + "</button>").join("");
+    $("#warehouse-cards").innerHTML = state.shelves.map(shelf => '<button class="warehouse-card" data-shelf="' + esc(shelf.id) + '">' + icon("shelf") + "<span><strong>" + esc(shelf.name) + "</strong><small>" + M.used(shelf) + " de " + M.CAPACITY + " posições ocupadas</small></span>" + icon("arrow") + "</button>").join("");
   }
   function setPhotoPreview() {
     const preview = $("#item-photo-preview");
@@ -169,16 +183,17 @@
     $("#remove-item-photo").hidden = !pendingPhoto;
     if (pendingPhoto) preview.src = pendingPhoto; else preview.removeAttribute("src");
   }
-  function openItem(row, position) {
-    const shelf = currentShelf(), item = M.at(shelf, row, position);
+  function openItem(row, position, shelfId = activeShelf) {
+    const shelf = shelfIn(state, shelfId), item = M.at(shelf, row, position);
     const selected = item ? item.start : position;
     const first = M.pairStart(selected);
+    const code = value => M.positionLabel(state, shelf.id, row, value);
     itemContext = {shelfId: shelf.id, row, position: selected, itemId: item?.id || null};
     photoSequence++; photoLoading = false; $("#save-item").disabled = false;
     $("#item-form").reset(); $("#item-error").textContent = "";
     $("#item-location").textContent = shelf.name + " · ANDAR " + row;
-    $("#item-dialog-title").textContent = "Posição " + row + selected;
-    $("#position-description").textContent = "Módulo " + String(Math.ceil(selected / 2)).padStart(2, "0") + " · posições " + row + first + " e " + row + (first + 1);
+    $("#item-dialog-title").textContent = "Posição " + M.positionLabel(state, shelf.id, row, selected, item?.span || 1);
+    $("#position-description").textContent = "Módulo " + String(Math.ceil(M.positionNumber(state, shelf.id, selected) / 2)).padStart(2, "0") + " · posições " + code(first) + " e " + code(first + 1);
     $("#position-status").textContent = item ? "Item cadastrado · edite os dados ou libere o espaço" : "Espaço livre para um novo item";
     $("#item-name").value = item?.name || ""; $("#item-quantity").value = item?.quantity ?? 1;
     $("#item-unit").value = item?.unit || "un"; $("#item-asset").value = item?.asset || ""; $("#item-notes").value = item?.notes || "";
@@ -186,8 +201,8 @@
     const fullRadio = $('input[name="span"][value="2"]');
     fullRadio.disabled = blocked; fullRadio.checked = item?.span === 2;
     $('input[name="span"][value="1"]').checked = item?.span !== 2;
-    $("#full-module-label").textContent = "Ocupa " + row + first + " + " + row + (first + 1);
-    $("#span-help").textContent = blocked ? "A outra posição está ocupada. O módulo inteiro não está disponível." : item?.span === 2 ? "Ao reduzir para uma posição, o item permanece em " + row + first + "." : "O módulo inteiro reserva as duas posições deste par.";
+    $("#full-module-label").textContent = "Ocupa " + code(first) + " + " + code(first + 1);
+    $("#span-help").textContent = blocked ? "A outra posição está ocupada. O módulo inteiro não está disponível." : item?.span === 2 ? "Ao reduzir para uma posição, o item permanece em " + code(first) + "." : "O módulo inteiro reserva as duas posições deste par.";
     $("#delete-item").hidden = !item;
     pendingPhoto = item?.photo || ""; setPhotoPreview();
     $("#item-dialog").showModal();
@@ -218,9 +233,9 @@
       await commit(next, "Posição liberada."); $("#item-dialog").close();
     } catch (error) { $("#item-error").textContent = error.message; }
   }
-  function openShelf(edit = false, planSide = null) {
+  function openShelf(edit = false, planSide = null, shelfId = activeShelf) {
     if (!edit && state.shelves.length >= 30) { toast("Esta versão permite até 30 prateleiras por galpão.", true); return; }
-    const shelf = edit ? currentShelf() : null;
+    const shelf = edit ? shelfIn(state, shelfId) : null;
     shelfContext = shelf?.id || null;
     $("#shelf-form").reset(); $("#shelf-error").textContent = "";
     $("#shelf-dialog-title").textContent = edit ? "Editar prateleira" : "Nova prateleira";
@@ -250,7 +265,7 @@
       if (id) Object.assign(shelfIn(next, id), {name, zone});
       else { id = M.uid(); next.shelves.push({id, name, zone, items: []}); }
       await commit(next, shelfContext ? "Prateleira atualizada." : "Nova prateleira criada.");
-      $("#shelf-dialog").close(); if (view === "shelf") showShelf(id);
+      $("#shelf-dialog").close();
     } catch (error) { $("#shelf-error").textContent = error.message; }
     finally { submit.disabled = false; }
   }
@@ -307,13 +322,22 @@
     });
     $("#add-shelf").onclick = () => openShelf();
     $("#warehouse-add").onclick = () => openShelf();
-    $("#edit-shelf").onclick = () => openShelf(true);
+    $("#shelves-nav").onclick = () => showShelf();
+    $("#shelf-filter").onchange = event => {
+      shelfFilter = event.target.value;
+      if (shelfFilter !== "all") activeShelf = shelfFilter;
+      render(); $(".shelves-scroll").scrollLeft = 0;
+    };
     ["#shelf-nav", "#hotspots", "#warehouse-cards"].forEach(selector => $(selector).addEventListener("click", event => { const button = event.target.closest("[data-shelf]"); if (button) showShelf(button.dataset.shelf); }));
     $("#hotspots").addEventListener("click", event => {
       const button = event.target.closest("[data-plan-add]");
       if (button) openShelf(false, button.dataset.planAdd);
     });
-    $("#rack").onclick = event => { const button = event.target.closest("[data-position]"); if (button) openItem(button.dataset.row, Number(button.dataset.position)); };
+    $("#rack").onclick = event => { const button = event.target.closest("[data-position]"); if (button) openItem(button.dataset.row, Number(button.dataset.position), button.dataset.shelfId); };
+    $("#rack").addEventListener("click", event => {
+      const button = event.target.closest("[data-edit-shelf]");
+      if (button) openShelf(true, null, button.dataset.editShelf);
+    });
     $("#search").oninput = renderMap;
     $$(".segmented button").forEach(button => { button.onclick = () => { filter = button.dataset.filter; renderMap(); }; });
     $$("[data-close]").forEach(button => { button.onclick = () => $("#" + button.dataset.close).close(); });

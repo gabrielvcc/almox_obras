@@ -6,10 +6,10 @@
       <rect width="6" height="6" fill="#edf1f6"/>
       <path d="M0 0v6" stroke="#b8c5d4" stroke-width="1"/>
     </pattern>
-    <pattern id="rack-bays" x="120" y="234" width="75" height="30" patternUnits="userSpaceOnUse">
-      <rect width="75" height="30" fill="#f1f5fa"/>
-      <path d="M0 0v30M37.5 0v30" stroke="#5c7b9b" stroke-width=".8"/>
-      <path d="M4 4h29.5v22H4zm37.5 0H71v22H41.5" stroke="#9aafc4" stroke-width=".65"/>
+    <pattern id="rack-bays" x="120" y="234" width="50" height="30" patternUnits="userSpaceOnUse">
+      <rect width="50" height="30" fill="#f1f5fa"/>
+      <path d="M0 0v30M25 0v30" stroke="#5c7b9b" stroke-width=".8"/>
+      <path d="M4 4h17v22H4zm25 0H46v22H29" stroke="#9aafc4" stroke-width=".65"/>
     </pattern>
   </defs>
   <rect x="0" y="150" width="1200" height="340" fill="#fbfcfe"/>
