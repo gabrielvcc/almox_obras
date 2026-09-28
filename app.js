@@ -70,15 +70,17 @@
   }
   function render() {
     if (shelfFilter !== "all" && !state.shelves.some(shelf => shelf.id === shelfFilter)) shelfFilter = "all";
-    $("#shelf-view").hidden = view !== "shelf"; $("#warehouse-view").hidden = view !== "warehouse"; $("#items-view").hidden = view !== "items";
-    for (const [id, page] of [["items-nav", "items"], ["warehouse-nav", "warehouse"], ["shelves-nav", "shelf"]]) {
+    $("#shelf-view").hidden = view !== "shelf"; $("#warehouse-view").hidden = view !== "warehouse"; $("#items-view").hidden = view !== "items"; $("#history-view").hidden = view !== "history";
+    for (const [id, page] of [["history-nav", "history"], ["items-nav", "items"], ["warehouse-nav", "warehouse"], ["shelves-nav", "shelf"]]) {
       $("#" + id).classList.toggle("active", view === page);
       $("#" + id).setAttribute("aria-current", view === page ? "page" : "false");
     }
-    const title = view === "items" ? "Itens" : view === "warehouse" ? "Meu galpão" : "Prateleiras";
+    const title = view === "history" ? "Histórico" : view === "items" ? "Itens" : view === "warehouse" ? "Meu galpão" : "Prateleiras";
     $("#breadcrumb-current").textContent = title; $("#shelf-title").textContent = "Prateleiras";
     document.title = title + " · Almox";
     $("#shelf-nav").innerHTML = '<button id="warehouse-mobile" class="nav-button" style="display:none" title="Visão do galpão" aria-label="Visão do galpão">' + icon("grid") + '</button><button id="items-mobile" class="nav-button ' + (view === "items" ? "active" : "") + '">' + icon("box") + 'Itens</button><button id="shelves-mobile" class="nav-button ' + (view === "shelf" ? "active" : "") + '">' + icon("shelf") + 'Prateleiras</button>';
+    $("#shelf-nav").insertAdjacentHTML("beforeend", '<button id="history-mobile" class="nav-button '+(view==="history"?"active":"")+'">'+icon("history")+'Histórico</button>');
+    $("#history-mobile").onclick=showHistory;
     $("#warehouse-mobile").onclick = showWarehouse; $("#items-mobile").onclick = showItems;
     $("#shelves-mobile").onclick = () => showShelf();
     $("#item-names").innerHTML = [...new Set(state.shelves.flatMap(shelf => shelf.items.map(item => item.name)))].map(name => '<option value="' + esc(name) + '"></option>').join("");
@@ -124,6 +126,7 @@
     $$(".segmented button").forEach(button => { button.classList.toggle("selected", button.dataset.filter === filter); button.setAttribute("aria-pressed", button.dataset.filter === filter); });
     $("#search-feedback").textContent = query || filter !== "all" ? (matches ? matches + " posições correspondem à busca. As demais aparecem esmaecidas." : "Nenhuma posição corresponde à busca. Tente outro termo ou filtro.") : "";
   }
+  function showHistory() { view="history";render();window.InventoryHistory.open(cloud); }
   function showItems() { view = "items"; render(); }
   function renderCatalog() {
     const groups = M.catalog(state), query = normalized($("#catalog-search").value);
@@ -319,6 +322,7 @@
     $(".brand").onclick = event => { event.preventDefault(); showWarehouse(); };
     $("#warehouse-nav").onclick = showWarehouse;
     $("#items-nav").onclick = showItems;
+    $("#history-nav").onclick = showHistory;
     $("#catalog-search").oninput = renderCatalog;
     $("#catalog-list").addEventListener("click", event => {
       const button = event.target.closest("[data-catalog-shelf]");

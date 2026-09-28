@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {initializeTestEnvironment, assertSucceeds, assertFails} = require("@firebase/rules-unit-testing");
 const F = require("firebase/firestore");
 const M = require("../inventory.js");
+const H = require("../history.js");
 const projectId = "demo-almox";
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(fn) { for(let i=0;i<300;i++){ if(fn()) return; await pause(30); } throw new Error("Timeout aguardando Firebase"); }
@@ -14,7 +15,10 @@ async function until(fn) { for(let i=0;i<300;i++){ if(fn()) return; await pause(
   const adminDb = admin.firestore(), viewerDb = viewer.firestore();
   const main = db => F.doc(db,"warehouses/main");
   const shelf = M.defaultState().shelves[0]; shelf.id = "first";
-  const metadata = revision => ({version:1,revision,shelfIds:["first"],warehousePhoto:"",updatedBy:"administrator",updatedAt:F.serverTimestamp()});
+  const metadata = revision => ({version:1,revision,historyId:"revision-"+revision,shelfIds:["first"],warehousePhoto:"",updatedBy:"administrator",updatedAt:F.serverTimestamp()});
+  function audit(batch,db,revision,overrides={}) {
+    batch.set(F.doc(db,"history/revision-"+revision),{revision,actorUid:"administrator",actorName:"",actorEmail:"",createdAt:F.serverTimestamp(),events:H.diff({warehousePhoto:"",shelves:[]},{warehousePhoto:"",shelves:[shelf]}),...overrides});
+  }
   try {
     await env.clearFirestore();
     await env.withSecurityRulesDisabled(context => F.setDoc(F.doc(context.firestore(),"admins/administrator"),{enabled:true}));
@@ -26,7 +30,7 @@ async function until(fn) { for(let i=0;i<300;i++){ if(fn()) return; await pause(
     await assertFails(F.getDocs(F.collection(adminDb,"admins")));
     await assertSucceeds(F.getDoc(F.doc(viewerDb,"admins/viewer")));
     const batch = F.writeBatch(adminDb); batch.set(main(adminDb),metadata(1)); batch.set(F.doc(adminDb,"warehouses/main/shelves/first"),shelf);
-    await assertSucceeds(batch.commit());
+    audit(batch,adminDb,1);await assertSucceeds(batch.commit());
     await assertSucceeds(F.getDoc(main(publicDb)));
     await assertSucceeds(F.getDocs(F.collection(publicDb,"warehouses/main/shelves")));
     await assertFails(F.setDoc(main(publicDb),metadata(2)));
@@ -37,8 +41,14 @@ async function until(fn) { for(let i=0;i<300;i++){ if(fn()) return; await pause(
     await assertFails(F.setDoc(main(adminDb),metadata(1)));
     const changed = F.writeBatch(adminDb);
     changed.set(main(adminDb),metadata(2)); changed.set(F.doc(adminDb,"warehouses/main/shelves/first"),{...shelf,name:"Atualizada"});
-    await assertSucceeds(changed.commit());
+    audit(changed,adminDb,2);await assertSucceeds(changed.commit());
     await assertFails(F.deleteDoc(main(adminDb)));
+    await assertSucceeds(F.getDocs(F.collection(publicDb,"history")));
+    await assertFails(F.updateDoc(F.doc(adminDb,"history/revision-1"),{actorName:"Outra pessoa"}));
+    await assertFails(F.deleteDoc(F.doc(adminDb,"history/revision-1")));
+    const fakeLog=F.writeBatch(adminDb);fakeLog.set(main(adminDb),metadata(3));audit(fakeLog,adminDb,3,{actorEmail:"outra@example.com"});await assertFails(fakeLog.commit());
+    const missingLog=F.writeBatch(adminDb);missingLog.set(main(adminDb),metadata(3));await assertFails(missingLog.commit());
+
     console.log("OK: leitura pública; somente administrador escreve; autopromoção e revisão inválida bloqueadas.");
     const photo='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
     const imageDoc=db=>F.doc(db,"photos/test-photo");
@@ -65,6 +75,7 @@ async function until(fn) { for(let i=0;i<300;i++){ if(fn()) return; await pause(
     await env.clearFirestore();
     global.window = global;
     global.Inventory = M;
+    global.InventoryHistory = H;
     global.location = {hostname:"127.0.0.1"};
     Object.defineProperty(global,"navigator",{value:{onLine:true},configurable:true});
     global.addEventListener = () => {};
@@ -108,11 +119,19 @@ async function until(fn) { for(let i=0;i<300;i++){ if(fn()) return; await pause(
     assert.equal((await F.getDoc(F.doc(publicDb,"warehouses/main/shelves/second-shelf"))).exists(),false);
     const without=M.clone(record.state);without.shelves[0].items[0].photo="";
     await AlmoxCloud.saveState(without,4);await until(()=>record.revision===5);
-    assert.equal((await F.getDoc(F.doc(publicDb,"photos",reference.slice(6)))).exists(),false);
+    assert.equal((await F.getDoc(F.doc(publicDb,"photos",reference.slice(6)))).exists(),true);
     const warehouse=M.clone(record.state);warehouse.warehousePhoto=photo;
     await AlmoxCloud.saveState(warehouse,5);await until(()=>record.revision===6);
     assert.equal(record.state.warehousePhoto,photo);
     assert.match((await F.getDoc(main(publicDb))).data().warehousePhoto,/^photo:/);
+    const history=await AlmoxCloud.getHistory();
+    assert.equal(history.entries.length,6);
+    assert.equal(history.entries[0].actorEmail,"owner@example.com");
+    assert(history.entries.find(log=>log.revision===2).events.some(e=>e.changes.some(c=>c.field==="quantity"&&c.before===5&&c.after===7)));
+    assert(history.entries.find(log=>log.revision===5).events.some(e=>e.changes.some(c=>c.field==="photo"&&c.before===reference&&c.after==="")));
+    assert.equal(await AlmoxCloud.getPhoto(reference),photo);
+    console.log("OK: histórico atômico, identidade, antes/depois e foto antiga preservada.");
+
     const run=require("node:util").promisify(require("node:child_process").execFile);
     const cold=await run(process.execPath,["tests/fixtures/firebase-public-reader.cjs"],{timeout:20000,windowsHide:true});console.log(cold.stdout.trim());
     await env.withSecurityRulesDisabled(context => F.setDoc(F.doc(context.firestore(),"admins",credential.user.uid),{enabled:false}));

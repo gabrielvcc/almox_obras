@@ -11,13 +11,38 @@ service cloud.firestore {
         && (value == '' || value.matches('photo:[A-Za-z0-9_-]{1,100}') || value.matches('https://firebasestorage[.]googleapis[.]com/v0/b/[^/]+/o/almox%2F.*'));
     }
     function validMain(data) {
-      return data.keys().hasAll(['version', 'revision', 'warehousePhoto', 'shelfIds', 'updatedBy', 'updatedAt'])
-        && data.keys().hasOnly(['version', 'revision', 'warehousePhoto', 'shelfIds', 'updatedBy', 'updatedAt'])
+      return data.keys().hasAll(['version', 'revision', 'warehousePhoto', 'shelfIds', 'updatedBy', 'updatedAt', 'historyId'])
+        && data.keys().hasOnly(['version', 'revision', 'warehousePhoto', 'shelfIds', 'updatedBy', 'updatedAt', 'historyId'])
+        && data.historyId is string && data.historyId.matches('[A-Za-z0-9_-]{1,100}')
         && data.version == 1 && data.revision is int && data.revision > 0
         && data.shelfIds is list && data.shelfIds.size() >= 1 && data.shelfIds.size() <= 30
         && data.shelfIds.toSet().size() == data.shelfIds.size()
         && validPhoto(data.warehousePhoto)
         && data.updatedBy == request.auth.uid && data.updatedAt == request.time;
+    }
+    function hasHistory(data) {
+      let path = /databases/$(database)/documents/history/$(data.historyId);
+      return !exists(path)
+        && getAfter(path).data.revision == data.revision
+        && getAfter(path).data.actorUid == request.auth.uid
+        && getAfter(path).data.createdAt == request.time;
+    }
+    match /history/{id} {
+      allow read: if true;
+      allow update, delete: if false;
+      allow create: if admin()
+        && request.resource.data.keys().hasAll(['revision', 'actorUid', 'actorName', 'actorEmail', 'createdAt', 'events'])
+        && request.resource.data.keys().hasOnly(['revision', 'actorUid', 'actorName', 'actorEmail', 'createdAt', 'events'])
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.actorName == request.auth.token.get('name', '')
+        && request.resource.data.actorEmail == request.auth.token.get('email', '')
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.events is list
+        && request.resource.data.events.size() > 0
+        && request.resource.data.events.size() <= 400
+        && getAfter(/databases/$(database)/documents/warehouses/main).data.historyId == id
+        && getAfter(/databases/$(database)/documents/warehouses/main).data.revision == request.resource.data.revision
+        && parentAdvanced();
     }
     function parentAdvanced() {
       return getAfter(/databases/$(database)/documents/warehouses/main).data.revision
@@ -48,7 +73,7 @@ service cloud.firestore {
         && request.resource.data.data.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}')
         && request.resource.data.updatedBy == request.auth.uid
         && request.resource.data.updatedAt == request.time;
-      allow delete: if admin();
+      allow delete: if false; // Preserva imagens citadas no histórico.
     }
     match /admins/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
@@ -56,8 +81,8 @@ service cloud.firestore {
     }
     match /warehouses/main {
       allow get: if true;
-      allow create: if admin() && validMain(request.resource.data) && request.resource.data.revision == 1;
-      allow update: if admin() && validMain(request.resource.data) && request.resource.data.revision == resource.data.revision + 1;
+      allow create: if admin() && validMain(request.resource.data) && hasHistory(request.resource.data) && request.resource.data.revision == 1;
+      allow update: if admin() && validMain(request.resource.data) && hasHistory(request.resource.data) && request.resource.data.revision == resource.data.revision + 1;
       allow delete: if false;
       match /shelves/{shelfId} {
         allow read: if true;

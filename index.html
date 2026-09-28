@@ -10,12 +10,14 @@
   <script defer src="inventory.js"></script>
   <script defer src="firebase-config.js"></script>
   <script defer src="photo-utils.js"></script>
+  <script defer src="history.js"></script>
   <script defer src="firebase-client.js"></script>
   <script defer src="warehouse-plan.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
   <svg class="svg-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7M12 7v5l3 2"/></symbol>
     <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
     <symbol id="i-shelf" viewBox="0 0 24 24"><path d="M4 3v18M20 3v18M4 10h16M4 19h16M8 5h4v5M13 14h4v5M7 15h3v4"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -38,6 +40,7 @@
     <button class="nav-button" id="warehouse-nav"><svg><use href="#i-grid"/></svg>Visão do galpão</button>
     <button class="nav-button" id="items-nav"><svg><use href="#i-box"/></svg>Itens</button>
     <button class="nav-button" id="shelves-nav"><svg><use href="#i-shelf"/></svg>Prateleiras</button>
+    <button class="nav-button" id="history-nav"><svg><use href="#i-history"/></svg>Histórico</button>
     <nav id="shelf-nav" aria-label="Prateleiras"></nav>
   </aside>
 
@@ -73,6 +76,23 @@
       <div class="catalog-toolbar"><label class="search"><svg><use href="#i-search"/></svg><input id="catalog-search" type="search" placeholder="Buscar item, patrimônio ou posição…" aria-label="Buscar nos itens"></label><span id="catalog-result" aria-live="polite"></span></div>
       <div id="catalog-list" class="catalog-list"></div>
     </section>
+    <section id="history-view" class="page" hidden>
+      <div class="page-heading"><div><p class="eyebrow">CADA ALTERAÇÃO REGISTRADA</p><h1>Histórico</h1><p class="subtitle">Quem alterou, quando e o que mudou no estoque.</p></div><button id="history-refresh" class="button secondary">Atualizar</button></div>
+      <div class="history-filters">
+        <label class="field">Buscar registro<input id="history-search" type="search" placeholder="Item, patrimônio, observação…"></label>
+        <label class="field">Pessoa<input id="history-person" type="search" placeholder="Nome ou e-mail"></label>
+        <label class="field">Registro<select id="history-kind"><option value="">Todos</option><option value="item">Itens</option><option value="shelf">Prateleiras</option><option value="warehouse">Galpão</option></select></label>
+        <label class="field">Ação<select id="history-action"><option value="">Todas</option><option value="create">Cadastro</option><option value="update">Edição</option><option value="delete">Exclusão</option></select></label>
+        <label class="field">Prateleira<select id="history-shelf"><option value="">Todas</option></select></label>
+        <label class="field">Campo alterado<select id="history-field"><option value="">Todos</option></select></label>
+        <label class="field">De<input id="history-from" type="date"></label>
+        <label class="field">Até<input id="history-to" type="date"></label>
+      </div>
+      <div class="history-toolbar"><span id="history-count" aria-live="polite"></span><button id="history-clear" class="text-button">Limpar filtros</button></div>
+      <p class="field-help">Os filtros se aplicam aos registros carregados. Carregue registros anteriores para ampliar a consulta.</p>
+      <p id="history-error" class="form-error" role="alert"></p><div id="history-list"></div>
+      <button id="history-more" class="button secondary">Carregar registros anteriores</button>
+    </section>
     <footer class="page-footer"><span>Organização que dá espaço ao que importa.</span><span>Feito para o seu dia a dia.</span></footer>
   </main>
 
@@ -99,6 +119,7 @@
     <div class="drawer-footer"><button type="button" class="button danger-secondary" id="delete-shelf" hidden>Excluir</button><button type="button" class="button secondary" data-close="shelf-dialog">Cancelar</button><button type="submit" class="button primary">Salvar prateleira</button></div></form>
   </dialog>
 
+  <dialog id="history-photo-dialog" class="modal"><div class="drawer-heading"><h2>Imagem registrada</h2><button id="history-photo-close" class="icon-button" aria-label="Fechar"><svg><use href="#i-close"/></svg></button></div><div class="drawer-body"><p id="history-photo-status" role="status"></p><img id="history-photo-image" alt="Versão da foto registrada no histórico" hidden></div></dialog>
   <dialog id="account-dialog" class="modal account-dialog" aria-labelledby="account-title">
     <div class="drawer-heading"><h2 id="account-title">Sua conta</h2><button type="button" class="icon-button" data-close="account-dialog" aria-label="Fechar"><svg><use href="#i-close"/></svg></button></div>
     <div class="drawer-body">

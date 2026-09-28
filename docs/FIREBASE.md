@@ -37,7 +37,7 @@ Enquanto a configuração não for preenchida, a interface permanece somente par
 
 Cole as regras em **Firestore Database > Regras** e clique em **Publicar**. As regras já incluem a coleção `photos`. A cópia usada nos testes fica em `tests/firebase/firestore.rules`.
 
-Publique o site na hospedagem estática habitual com `index.html`, `styles.css`, `inventory.js`, `firebase-config.js`, `firebase-client.js`, `app.js`, `photo-utils.js` e `warehouse-plan.js`. Preserve também o `CNAME` caso use domínio próprio no GitHub Pages. Não é necessário usar Firebase Hosting nem instalar ferramentas para publicar regras pelo painel.
+Publique o site na hospedagem estática habitual com `index.html`, `styles.css`, `inventory.js`, `firebase-config.js`, `firebase-client.js`, `app.js`, `photo-utils.js`, `history.js` e `warehouse-plan.js`. Preserve também o `CNAME` caso use domínio próprio no GitHub Pages. Não é necessário usar Firebase Hosting nem instalar ferramentas para publicar regras pelo painel.
 
 No Firestore, é recomendável criar uma isenção de índices de campo único para `photos.data`, desabilitando os índices desse campo de imagem; ele não é usado em buscas.
 
@@ -71,7 +71,7 @@ Alterações chegam às outras sessões automaticamente. Se outra pessoa modific
 
 Fotos PNG, JPG e WebP de até 25 MB são convertidas no navegador para JPEG, com fundo branco, lado maior de até 1200 pixels e no máximo 260.000 caracteres de base64 (cerca de 190 KiB de imagem). A qualidade e as dimensões diminuem conforme necessário.
 
-Foto e cadastro são salvos na mesma transação. Ao remover ou substituir uma foto, seu documento é excluído se nenhum cadastro atual o referenciar. As fotos são carregadas na leitura do estoque e mantidas em cache durante a sessão, evitando novas leituras a cada alteração de quantidade. URLs antigas do Storage permanecem compatíveis; novas fotos não usam o Storage.
+Foto e cadastro são salvos na mesma transação. As fotos anteriores são preservadas para permitir a consulta no histórico, inclusive após a exclusão de um item. As fotos são carregadas na leitura do estoque e mantidas em cache durante a sessão, evitando novas leituras a cada alteração de quantidade. URLs antigas do Storage permanecem compatíveis; novas fotos não usam o Storage.
 
 Alterações muito grandes, como importar muitas fotos de uma vez, podem exigir etapas menores. O aplicativo limita o tamanho da transação para evitar ultrapassar o limite do banco.
 
@@ -92,3 +92,13 @@ python -m http.server 8000
 ```
 
 Abra `http://localhost:8000`. O login exige uma origem autorizada; abrir o HTML diretamente como arquivo não substitui essa etapa.
+
+## Histórico de alterações
+
+A página Histórico é pública e registra autor (UID, nome e e-mail do token autenticado), horário do servidor, cadastro afetado, localização e valores antes/depois. Abrange itens, prateleiras, disposição da planta, exclusões e fotos do galpão. Imagens antigas permanecem acessíveis e continuam ocupando espaço no banco.
+
+Cada salvamento grava `history/{id}` na mesma transação que altera o estoque. `warehouses/main.historyId` vincula os documentos. As regras exigem essa ligação, validam a identidade e impedem editar/apagar registros pelo aplicativo. O conteúdo detalhado da comparação é calculado pelo cliente; este histórico não substitui auditoria das alterações manuais feitas pelo proprietário no console ou por credenciais administrativas.
+
+Publique o conteúdo completo de `tests/firebase/firestore.rules` em Firestore > Regras, junto com a nova versão do site. Clientes antigos não conseguem salvar sem registrar o histórico. As contas em `admins` permanecem iguais. Nenhuma edição anterior à ativação é reconstruída.
+
+São carregados 50 salvamentos por vez, mais recentes primeiro. Use Carregar registros anteriores para ampliar o período consultado; os filtros se aplicam aos registros já carregados. Atualizar busca novamente as entradas recentes. Fotos antigas só são lidas ao clicar em Ver imagem.

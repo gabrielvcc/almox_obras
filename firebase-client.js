@@ -148,20 +148,29 @@
       });
       for(const shelf of next.shelves)if(new Blob([JSON.stringify(shelf)]).size>800000)throw new Error("Esta prateleira tem informações demais. Reduza as observações antes de salvar.");
       const active=new Set(photoValues(next).filter(photoRef));
-      const removed=[...new Set(photoValues(previous).filter(photoRef))].filter(ref=>!active.has(ref));
+      const removed=[]; // Fotos antigas permanecem disponíveis no histórico.
       const size=JSON.stringify(next).length+[...pending.values()].reduce((sum,data)=>sum+data.length,0)+removed.reduce((sum,ref)=>sum+(photoCache.get(ref)?.length||260000),0);
       if(size>7000000 || pending.size+removed.length+next.shelves.length+previous.shelves.length>450)throw new Error("Há fotos demais para uma única alteração. Faça a mudança em etapas menores.");
       const display=M.validateState(await mapPhotos(next,ref=>pending.get(ref)||photoCache.get(ref)||ref));
       requireAdmin();
       if(auth.currentUser.uid!==uid)throw new Error("A conta mudou. Reabra o cadastro antes de salvar.");
+      const events=window.InventoryHistory.diff(cache.exists?previous:{version:1,warehousePhoto:"",shelves:[]},next);
+      if(!events.length)return M.clone(cache);
+      const identity=await auth.currentUser.getIdTokenResult();
+      requireAdmin();
+      if(auth.currentUser.uid!==uid)throw new Error("A conta mudou. Reabra o cadastro antes de salvar.");
+      const historyId=M.uid();
+      const history={revision:expectedRevision+1,actorUid:uid,actorName:identity.claims.name||"",actorEmail:identity.claims.email||"",createdAt:F.serverTimestamp(),events};
+      if(events.length>400||new Blob([JSON.stringify(history)]).size>700000)throw new Error("Há alterações demais para um único registro. Faça a mudança em etapas menores.");
       await F.runTransaction(db,async transaction=>{
         const current=await transaction.get(rootRef);
         if((current.exists()?current.data().revision:0)!==expectedRevision)throw conflict();
         const oldShelves=new Map(previous.shelves.map(shelf=>[shelf.id,shelf]));
-        transaction.set(rootRef,{version:1,revision:expectedRevision+1,warehousePhoto:next.warehousePhoto,shelfIds:next.shelves.map(shelf=>shelf.id),updatedBy:uid,updatedAt:F.serverTimestamp()});
+        transaction.set(F.doc(db,"history",historyId),history);
+        transaction.set(rootRef,{version:1,revision:expectedRevision+1,historyId,warehousePhoto:next.warehousePhoto,shelfIds:next.shelves.map(shelf=>shelf.id),updatedBy:uid,updatedAt:F.serverTimestamp()});
         for(const [ref,data] of pending)transaction.set(F.doc(db,"photos",ref.slice(6)),{data,updatedBy:uid,updatedAt:F.serverTimestamp()});
         for(const shelf of next.shelves){
-          if(!current.exists()||JSON.stringify(oldShelves.get(shelf.id))!==JSON.stringify(shelf))transaction.set(F.doc(db,"warehouses/main/shelves",shelf.id),shelf);
+          if(!current.exists()||!window.InventoryHistory.equal(oldShelves.get(shelf.id),shelf))transaction.set(F.doc(db,"warehouses/main/shelves",shelf.id),shelf);
           oldShelves.delete(shelf.id);
         }
         for(const id of oldShelves.keys())transaction.delete(F.doc(db,"warehouses/main/shelves",id));
@@ -175,7 +184,7 @@
       }
       return result;
     }catch(error){
-      if(pending.size&&error.code==="permission-denied")throw new Error("Não foi possível salvar a foto. Confira sua autorização e publique as novas regras de fotos no Firestore.");
+      if(error.code==="permission-denied")throw new Error("Não foi possível salvar. Confira sua autorização e publique as regras atualizadas de histórico no Firestore.");
       throw new Error(errorMessage(error));
     }finally{busy=false;}
   }
@@ -198,5 +207,12 @@
       };
     });
   }
-  window.AlmoxCloud = {configured, init, login, logout, saveState, readLegacy, errorMessage};
+  async function getHistory(cursor=null) {
+    if(!db)throw new Error("O histórico ainda não está disponível.");
+    const clauses=[F.orderBy("revision","desc"),F.limit(50)];
+    if(cursor)clauses.push(F.startAfter(cursor));
+    const result=await F.getDocsFromServer(F.query(F.collection(db,"history"),...clauses));
+    return {entries:result.docs.map(doc=>({...doc.data(),id:doc.id,createdAt:doc.data().createdAt.toDate().toISOString()})),cursor:result.docs.at(-1)||null,more:result.size===50};
+  }
+  window.AlmoxCloud = {configured, init, login, logout, saveState, readLegacy, errorMessage, getHistory, getPhoto:resolvePhoto};
 })();

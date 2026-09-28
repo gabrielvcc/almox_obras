@@ -365,6 +365,26 @@ try:
     client.call("Emulation.setDeviceMetricsOverride", {"width":1440,"height":1000,"deviceScaleFactor":1,"mobile":False})
     client.screenshot("warehouse-live.png")
     print("OK: planta com três prateleiras, ocupação real e permissão de organização.", flush=True)
+    client.evaluate("""(async()=>{
+      q('#history-nav').click();await until(()=>q('.history-entry'));
+      check(!q('#history-view').hidden&&q('#shelf-view').hidden,'Página pública de histórico');
+      check(q('#history-list').textContent.includes('admin@example.com'),'E-mail do autor visível');
+      q('#history-kind').value='item';q('#history-kind').dispatchEvent(new Event('input'));
+      q('#history-field').value='quantity';q('#history-field').dispatchEvent(new Event('input'));
+      q('#history-action').value='update';q('#history-action').dispatchEvent(new Event('input'));
+      check(document.querySelectorAll('.history-change').length>0,'Filtros combinados encontram edições');
+      check(q('#history-list').textContent.includes('Quantidade'),'Antes e depois da quantidade');
+      q('#history-person').value='inexistente';q('#history-person').dispatchEvent(new Event('input'));check(!q('.history-entry'),'Filtro por usuário');
+      q('#history-clear').click();
+      const image=q('[data-history-photo]');check(image,'Histórico registra fotos');image.click();
+      await until(()=>!q('#history-photo-image').hidden);check(q('#history-photo-dialog').open,'Foto histórica abre');q('#history-photo-close').click();
+      q('#history-from').value='2099-01-01';q('#history-from').dispatchEvent(new Event('input'));check(!q('.history-entry'),'Filtro de período');q('#history-clear').click();
+    })()""")
+    client.screenshot("history-desktop.png")
+    client.call("Emulation.setDeviceMetricsOverride", {"width":390,"height":844,"deviceScaleFactor":1,"mobile":True})
+    client.evaluate("check(document.documentElement.scrollWidth<=392,'Histórico cabe no celular');check(q('#history-mobile'),'Histórico no menu móvel');")
+    client.screenshot("history-mobile.png")
+    print("OK: histórico público, autores, comparação, filtros e imagens no computador e celular.", flush=True)
     if client.errors:
         raise AssertionError(json.dumps(client.errors, ensure_ascii=False))
     print("OK: responsividade a 390 px e nenhum erro JavaScript não tratado.", flush=True)

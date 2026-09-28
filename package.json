@@ -6,7 +6,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node tests/inventory.test.js && node tests/warehouse-plan.test.js",
+    "test": "node tests/inventory.test.js && node tests/warehouse-plan.test.js && node tests/history.test.js",
     "test:rules": "firebase emulators:exec --config tests/firebase/firebase.json --project demo-almox --only firestore,auth \"node tests/firebase-rules.test.cjs\"",
     "test:browser": "python tests/browser_check.py"
   },
