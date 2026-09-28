@@ -18,7 +18,17 @@
   }
   function photo(value) {
     ensure(typeof value === "string" && value.length <= 14000000, "Foto inválida ou muito grande.");
-    ensure(!value || /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value), "Formato de foto inválido.");
+    let remote = false;
+    if (value.startsWith("https:") && value.length <= 2048) {
+      try {
+        const url = new URL(value);
+        remote = url.protocol === "https:" && url.hostname === "firebasestorage.googleapis.com"
+          && !url.username && !url.password && !url.port
+          && /^\/v0\/b\/[^/]+\/o\/almox%2F[A-Za-z0-9_.%-]+$/.test(url.pathname)
+          && (!globalThis.ALMOX_FIREBASE_CONFIG?.storageBucket || decodeURIComponent(url.pathname.split("/")[3]) === globalThis.ALMOX_FIREBASE_CONFIG.storageBucket);
+      } catch {}
+    }
+    ensure(!value || remote || /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value), "Formato de foto inválido.");
     return value;
   }
   function validateZone(zone) {

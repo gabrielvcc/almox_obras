@@ -119,3 +119,51 @@ dialog{border:0;color:var(--ink);padding:0;background:#fff;box-shadow:0 15px 80p
 @media(max-width:550px){.shelf-filter-bar{padding:16px 15px 0;flex-wrap:wrap;gap:8px}.shelf-filter-bar select{min-width:0;flex:1;max-width:100%}#shelf-range{flex-basis:100%;margin-left:0;font-size:9px}.shelves-strip{gap:20px}.shelf-board{padding:0 3px}}
 
 
+
+/* A ausência de uma sessão autorizada sempre mantém a interface em consulta. */
+body:not(.can-edit) [data-admin]{display:none!important}
+.account-dialog{width:420px}
+.account-dialog .drawer-heading h2{font-size:21px}
+.account-dialog p{font-size:12px;color:#74879b;line-height:1.7}
+.account-dialog #account-name{font-size:17px}
+.account-dialog #account-email{margin-top:6px;overflow-wrap:anywhere}
+.account-role{display:inline-block;background:#eaf0f8;color:#42668c;padding:7px 11px;border-radius:16px;font-size:11px;margin-bottom:20px}
+.account-details{border-top:1px solid #e1e7ef;padding-top:15px;margin-bottom:20px}
+.account-details summary{cursor:pointer;font-size:11px;color:#74879b;margin-bottom:12px}
+.account-details input{width:100%;border:1px solid #d8e1eb;border-radius:5px;padding:9px;font-size:11px;color:#42668c;margin-bottom:10px}
+.account-dialog #legacy-import{display:flex;margin-bottom:12px}
+.account-dialog .form-error{margin-top:16px;color:var(--danger)}
+.google-letter{font-size:17px;font-weight:700;line-height:1;margin-right:4px}
+.drawer.is-readonly .field input:disabled,.drawer.is-readonly .field select:disabled,.drawer.is-readonly .field textarea:disabled{opacity:1;color:#345776;-webkit-text-fill-color:#345776;cursor:default;background:#f8fafd}
+.drawer.is-readonly .photo-picker{cursor:default}
+.drawer.is-readonly #photo-placeholder{display:none}
+.drawer.is-readonly .photo-picker:has(img[hidden])::after{content:"Sem foto";font-size:12px;font-weight:400;color:#8294a8}
+.drawer.is-readonly .size-options{pointer-events:none}
+.drawer.is-readonly .size-options label:has(input:disabled){opacity:1}
+.drawer.is-readonly .required{display:none}
+.plan-shelf.unassigned:disabled{opacity:.65;cursor:default}
+.plan-shelf.unassigned:disabled .plan-label>svg{display:none}
+@media(max-width:550px){.topbar{gap:10px}.breadcrumb{min-width:0}.breadcrumb>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#account-button{font-size:10px;padding:7px 10px;min-height:32px;flex-shrink:0}}
+
+/* Planta viva do galpão */
+.warehouse-toolbar{justify-content:space-between;flex-wrap:wrap;gap:12px}.warehouse-toolbar .button-group{flex-wrap:wrap}
+.warehouse-scroll.is-plan .warehouse-stage{min-width:0;max-width:none}.warehouse-scroll.is-plan .warehouse-illustration{height:auto;padding:0;overflow:visible}
+svg.warehouse-plan{display:block;width:100%;height:auto;fill:none;stroke:none;user-select:none;font-family:"Segoe UI",Arial,sans-serif}
+.warehouse-plan .plan-wall{fill:none;stroke:#4c637c;stroke-width:9;stroke-linecap:square;stroke-linejoin:miter}
+.warehouse-plan .plan-gate{stroke:#8297ad;stroke-width:2;stroke-dasharray:6 4}.warehouse-plan .plan-axis{stroke:#cad5e2;stroke-width:1;stroke-dasharray:14 6 2 6}
+.warehouse-plan text{stroke:none;fill:#546d87}.plan-heading{font-size:12px;letter-spacing:2px}.plan-footnote,.plan-door{font-size:9px;letter-spacing:1px;text-anchor:middle}.plan-footnote{text-anchor:start}.plan-footnote[text-anchor="end"]{text-anchor:end}
+.plan-rack{cursor:pointer;outline:none}.plan-rack-frame{fill:#f9fbfe;stroke:#7e99b4;stroke-width:1.3}.plan-rack-name{font-weight:600;fill:#234e78!important}.plan-cell.empty{fill:#edf3f9;stroke:#bacbdb;stroke-width:.45}.plan-cell.filled{fill:#356b9d;stroke:#234e78;stroke-width:.45}.plan-rack.is-full .plan-rack-frame{fill:#dce8f5;stroke:#143859;stroke-width:3}.plan-rack.is-full .plan-cell.filled{fill:#173c60}
+.plan-rack:hover .plan-rack-frame,.plan-rack:focus-visible .plan-rack-frame,.plan-rack.is-selected .plan-rack-frame{stroke:#256cb0;stroke-width:3}
+.editing-plan .warehouse-illustration,.vector-preview{touch-action:none}.editing-plan .plan-rack,.vector-preview .plan-rack.is-selected{cursor:grab}.editing-plan .plan-rack:active{cursor:grabbing}
+.plan-status{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:12px 0 20px;font-size:11px;color:var(--muted)}.plan-status p{margin:0;line-height:1.6}.plan-legend{display:flex;gap:14px;flex-wrap:wrap}.plan-legend span{display:flex;align-items:center;gap:6px}.plan-legend i{width:10px;height:10px;background:#edf3f9;border:1px solid #bacbdb}.plan-legend i.filled{background:#356b9d}.plan-legend i.full{background:#173c60;border:2px solid #102d49}
+.zone-preview.vector-preview{height:auto;min-height:190px;background:#fbfcfe;overflow:hidden}.vector-preview svg.warehouse-plan{min-height:190px}.vector-preview .plan-rack:not(.is-selected){opacity:.45;cursor:default}
+@media(max-width:550px){.warehouse-toolbar .button{padding:9px}.plan-status{font-size:10px}.plan-legend{gap:9px}}
+/* Prateleiras em projeção superior, com estrutura e volumes ilustrativos. */
+.plan-rack-shadow{fill:#243f5b14;stroke:none;pointer-events:none}
+.plan-rack-frame{fill:#e8eef4;stroke:#69849d;stroke-width:1.2}
+.plan-bay-floor{fill:#f7f9fc;stroke:none}.plan-bay.filled .plan-bay-floor{fill:#dce7f1}
+.plan-package{fill:#a8bed3;stroke:#718ea9;stroke-width:.65}.plan-package-seam{fill:none;stroke:#dce6ef;stroke-width:1}
+.plan-upright{fill:none;stroke:#728da6;stroke-width:1.3}.plan-rail{fill:none;stroke:#496783;stroke-width:2}
+.plan-rack.is-full .plan-package{fill:#35618a;stroke:#234e78}.plan-rack.is-full .plan-rack-frame{fill:#dce8f5;stroke:#234e78;stroke-width:2}
+.plan-placement{fill:#356b9d04;stroke:#9bb2c8;stroke-width:.8;stroke-dasharray:4 4}
+.plan-rack.is-selected .plan-placement{stroke:#356b9d;fill:#356b9d08}

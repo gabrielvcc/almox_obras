@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function admin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true;
+    }
+    function validPhoto(value) {
+      return value is string && value.size() <= 2048
+        && (value == '' || value.matches('photo:[A-Za-z0-9_-]{1,100}') || value.matches('https://firebasestorage[.]googleapis[.]com/v0/b/[^/]+/o/almox%2F.*'));
+    }
+    function validMain(data) {
+      return data.keys().hasAll(['version', 'revision', 'warehousePhoto', 'shelfIds', 'updatedBy', 'updatedAt'])
+        && data.keys().hasOnly(['version', 'revision', 'warehousePhoto', 'shelfIds', 'updatedBy', 'updatedAt'])
+        && data.version == 1 && data.revision is int && data.revision > 0
+        && data.shelfIds is list && data.shelfIds.size() >= 1 && data.shelfIds.size() <= 30
+        && data.shelfIds.toSet().size() == data.shelfIds.size()
+        && validPhoto(data.warehousePhoto)
+        && data.updatedBy == request.auth.uid && data.updatedAt == request.time;
+    }
+    function parentAdvanced() {
+      return getAfter(/databases/$(database)/documents/warehouses/main).data.revision
+        == (exists(/databases/$(database)/documents/warehouses/main)
+            ? get(/databases/$(database)/documents/warehouses/main).data.revision + 1 : 1);
+    }
+    function validShelf(data, shelfId) {
+      return data.keys().hasAll(['id', 'name', 'zone', 'items'])
+        && data.keys().hasOnly(['id', 'name', 'zone', 'items'])
+        && data.id == shelfId && shelfId.matches('[A-Za-z0-9_-]{1,100}')
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 60
+        && data.zone is map && data.zone.keys().hasAll(['x', 'y', 'w', 'h'])
+        && data.zone.keys().hasOnly(['x', 'y', 'w', 'h'])
+        && data.zone.x is number && data.zone.y is number && data.zone.w is number && data.zone.h is number
+        && data.zone.x >= 0 && data.zone.y >= 0 && data.zone.w >= 5 && data.zone.h >= 5
+        && data.zone.x + data.zone.w <= 100 && data.zone.y + data.zone.h <= 100
+        && data.items is list && data.items.size() <= 96;
+    }
+    match /photos/{photoId} {
+      allow get: if true;
+      allow list, update: if false;
+      allow create: if admin()
+        && photoId.matches('[A-Za-z0-9_-]{1,100}')
+        && request.resource.data.keys().hasAll(['data', 'updatedBy', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['data', 'updatedBy', 'updatedAt'])
+        && request.resource.data.data is string
+        && request.resource.data.data.size() <= 260000
+        && request.resource.data.data.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}')
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if admin();
+    }
+    match /admins/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+    match /warehouses/main {
+      allow get: if true;
+      allow create: if admin() && validMain(request.resource.data) && request.resource.data.revision == 1;
+      allow update: if admin() && validMain(request.resource.data) && request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+      match /shelves/{shelfId} {
+        allow read: if true;
+        allow create, update: if admin() && validShelf(request.resource.data, shelfId)
+          && parentAdvanced()
+          && shelfId in getAfter(/databases/$(database)/documents/warehouses/main).data.shelfIds;
+        allow delete: if admin() && parentAdvanced()
+          && !(shelfId in getAfter(/databases/$(database)/documents/warehouses/main).data.shelfIds);
+      }
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

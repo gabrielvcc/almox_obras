@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict'),P=require('../warehouse-plan.js'),M=require('../inventory.js');
+const zone={x:5,y:10,w:42,h:22};
+assert.deepEqual(P.move(zone,200,-10),{x:58,y:0,w:42,h:22});
+const shelves=[{id:'one',name:'<img onerror=bad>',zone,items:[]}];
+assert.equal((P.draw(shelves).match(/class="plan-bay /g)||[]).length,12);
+assert(!P.draw(shelves).includes('<img'));
+assert(!P.draw(shelves).includes('plan-row'));
+assert(P.draw([{...shelves[0],zone:{x:0,y:0,w:5,h:80}}]).includes('rotate(90)'));
+for(const row of M.ROWS)for(let start=1;start<=24;start+=2)shelves[0].items.push({id:row+start,row,start,span:2,name:'Caixa',quantity:1,unit:'un'});
+let svg=P.draw(shelves);assert(svg.includes('is-full'));assert(svg.includes('96/96'));assert.equal((svg.match(/class="plan-bay filled/g)||[]).length,12);
+shelves[0].items.pop();svg=P.draw(shelves);assert(!svg.includes('is-full'));assert.equal((svg.match(/class="plan-bay empty/g)||[]).length,0);
+const next=P.nextZone(shelves);assert.doesNotThrow(()=>M.validateZone(next));assert.notDeepEqual(next,zone);
+console.log('OK: limites, posição disponível, ocupação dupla, prateleira cheia e nomes escapados.');

@@ -8,6 +8,10 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23234e78'/%3E%3Cpath d='M10 10v22m20-22v22M10 16h20M10 26h20' stroke='%23dce9f7' stroke-width='3'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
   <script defer src="inventory.js"></script>
+  <script defer src="firebase-config.js"></script>
+  <script defer src="photo-utils.js"></script>
+  <script defer src="firebase-client.js"></script>
+  <script defer src="warehouse-plan.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -38,10 +42,10 @@
   </aside>
 
   <main>
-    <header class="topbar"><div class="breadcrumb">Meu galpão <svg><use href="#i-arrow"/></svg><span id="breadcrumb-current">Prateleira direita</span></div></header>
-    <div id="storage-warning" class="warning" hidden>Não foi possível guardar as alterações. Elas poderão ser perdidas ao fechar esta página.</div>
+    <header class="topbar"><div class="breadcrumb">Meu galpão <svg><use href="#i-arrow"/></svg><span id="breadcrumb-current">Prateleiras</span></div><button type="button" id="account-button" class="button secondary">Entrar</button></header>
+    <div id="storage-warning" class="warning" hidden>Não foi possível carregar o estoque. Tente novamente.</div>
     <section id="shelf-view" class="page">
-      <div class="page-heading"><div><p class="eyebrow">CADA COISA EM SEU LUGAR</p><h1 id="shelf-title">Prateleiras</h1><p class="subtitle">Encontre, organize e acompanhe o que está guardado.</p></div><button class="button primary" id="add-shelf"><svg><use href="#i-plus"/></svg>Nova prateleira</button></div>
+      <div class="page-heading"><div><p class="eyebrow">CADA COISA EM SEU LUGAR</p><h1 id="shelf-title">Prateleiras</h1><p class="subtitle">Encontre, organize e acompanhe o que está guardado.</p></div><button class="button primary" id="add-shelf" data-admin><svg><use href="#i-plus"/></svg>Nova prateleira</button></div>
       <div class="stats">
         <article class="stat"><span class="stat-icon"><svg><use href="#i-grid"/></svg></span><div><span class="stat-label">Posições ocupadas</span><div class="stat-value"><strong id="occupied-count">0</strong><span id="total-capacity">/ 96</span></div></div><span class="stat-tag" id="occupancy-percent">0%</span></article>
         <article class="stat"><span class="stat-icon mint"><svg><use href="#i-check"/></svg></span><div><span class="stat-label">Posições disponíveis</span><div class="stat-value"><strong id="available-count">96</strong><span>livres para usar</span></div></div></article>
@@ -59,10 +63,10 @@
     </section>
 
     <section id="warehouse-view" class="page" hidden>
-      <div class="page-heading"><div><p class="eyebrow">UMA VISÃO DO TODO</p><h1>Meu galpão</h1><p class="subtitle">Selecione uma prateleira para explorar suas posições.</p></div><button class="button primary" id="warehouse-add"><svg><use href="#i-plus"/></svg>Nova prateleira</button></div>
-      <div class="warehouse-toolbar"><div class="button-group"><button class="button secondary" id="change-photo"><svg><use href="#i-photo"/></svg>Usar foto do galpão</button><button class="button secondary" id="remove-warehouse-photo" hidden>Voltar ao croqui</button></div></div>
-      <div class="warehouse-scroll is-plan" id="warehouse-scroll"><div class="warehouse-stage" id="warehouse-stage"><img id="warehouse-image" alt="Foto do galpão" hidden><div class="warehouse-illustration" id="warehouse-illustration"><img class="warehouse-plan-image" src="galpao.svg" alt="Croqui do galpão com prateleiras laterais e entradas nas duas pontas."></div><div id="hotspots"></div></div></div>
-      <div id="warehouse-cards" class="warehouse-cards"></div>
+      <div class="page-heading"><div><p class="eyebrow">UMA VISÃO DO TODO</p><h1>Meu galpão</h1><p class="subtitle">Selecione uma prateleira para explorar suas posições.</p></div><button class="button primary" id="warehouse-add" data-admin><svg><use href="#i-plus"/></svg>Nova prateleira</button></div>
+      <div class="warehouse-toolbar"><div class="button-group"><button class="button secondary" id="plan-edit" data-admin>Organizar planta</button><button class="button primary" id="plan-save" data-admin hidden>Salvar disposição</button><button class="button secondary" id="plan-cancel" data-admin hidden>Cancelar</button><button class="button secondary" id="plan-zoom-out" aria-label="Diminuir planta">−</button><button class="button secondary" id="plan-zoom-reset">Ajustar</button><button class="button secondary" id="plan-zoom-in" aria-label="Ampliar planta">+</button><button class="button secondary" id="change-photo" data-admin><svg><use href="#i-photo"/></svg>Usar foto do galpão</button><button class="button secondary" id="remove-warehouse-photo" data-admin hidden>Voltar ao croqui</button></div></div>
+      <div class="warehouse-scroll is-plan" id="warehouse-scroll"><div class="warehouse-stage" id="warehouse-stage"><img id="warehouse-image" alt="Foto do galpão" hidden><div class="warehouse-illustration" id="warehouse-illustration"></div><div id="hotspots"></div></div></div>
+      <div class="plan-status"><p id="plan-instructions" role="status"></p><div class="plan-legend"><span><i></i>Módulo vazio</span><span><i class="filled"></i>Com itens</span><span><i class="full"></i>Prateleira cheia</span></div></div><div id="warehouse-cards" class="warehouse-cards"></div>
     </section>
     <section id="items-view" class="page" hidden>
       <div class="page-heading"><div><p class="eyebrow">TUDO EM UM SÓ LUGAR</p><h1>Itens</h1><p class="subtitle">Consulte as quantidades e onde cada item está guardado.</p></div><span class="catalog-count" id="catalog-count"></span></div>
@@ -81,20 +85,28 @@
         <div class="form-row"><label class="field">Quantidade <span class="required">*</span><input id="item-quantity" type="number" min="0.001" step="any" value="1" required></label><label class="field">Unidade<select id="item-unit"><option value="un">Unidades (un)</option><option value="sc">Sacos (sc)</option><option value="cx">Caixas (cx)</option><option value="kg">Quilos (kg)</option><option value="m">Metros (m)</option><option value="L">Litros (L)</option><option value="pc">Peças (pç)</option></select></label></div>
         <label class="field">Número do patrimônio<input id="item-asset" maxlength="100" placeholder="Ex.: PAT-00124"></label>
         <div class="field">Espaço ocupado<div class="size-options"><label><input name="span" type="radio" value="1" checked><span><strong>Uma posição</strong><small>Item de tamanho padrão</small></span></label><label><input name="span" type="radio" value="2"><span><strong>Módulo inteiro</strong><small id="full-module-label">Ocupa A1 + A2</small></span></label></div><small id="span-help" class="field-help"></small></div>
-        <div class="field">Foto do item<label class="photo-picker" for="item-photo"><img id="item-photo-preview" alt="Prévia da foto do item" hidden><span id="photo-placeholder"><svg><use href="#i-photo"/></svg><strong>Clique para anexar uma foto</strong><small>JPG, PNG ou WebP · até 10 MB</small></span><input id="item-photo" type="file" accept="image/jpeg,image/png,image/webp" class="visually-hidden"></label><button type="button" class="text-button danger" id="remove-item-photo" hidden>Remover foto</button></div>
+        <div class="field">Foto do item<label class="photo-picker" for="item-photo"><img id="item-photo-preview" alt="Prévia da foto do item" hidden><span id="photo-placeholder"><svg><use href="#i-photo"/></svg><strong>Clique para anexar uma foto</strong><small>JPG, PNG ou WebP · até 25 MB · compressão automática</small></span><input id="item-photo" type="file" accept="image/jpeg,image/png,image/webp" class="visually-hidden"></label><button type="button" class="text-button danger" id="remove-item-photo" data-admin hidden>Remover foto</button></div>
         <label class="field">Observações<textarea id="item-notes" rows="3" maxlength="2000" placeholder="Detalhes, condições do material ou algo para lembrar…"></textarea></label>
         <p class="form-error" id="item-error" role="alert"></p>
       </div>
-      <div class="drawer-footer"><button type="button" class="button danger-secondary" id="delete-item" hidden>Liberar posição</button><button type="button" class="button secondary" data-close="item-dialog">Cancelar</button><button type="submit" class="button primary" id="save-item"><svg><use href="#i-check"/></svg>Salvar item</button></div>
+      <div class="drawer-footer"><button type="button" class="button danger-secondary" id="delete-item" data-admin hidden>Liberar posição</button><button type="button" class="button secondary" id="item-dismiss" data-close="item-dialog">Cancelar</button><button type="submit" class="button primary" id="save-item" data-admin><svg><use href="#i-check"/></svg>Salvar item</button></div>
     </form>
   </dialog>
 
   <dialog id="shelf-dialog" class="modal" aria-labelledby="shelf-dialog-title">
     <form id="shelf-form"><div class="drawer-heading"><div><p class="eyebrow">ORGANIZE SEU ESPAÇO</p><h2 id="shelf-dialog-title">Nova prateleira</h2></div><button type="button" class="icon-button" data-close="shelf-dialog" aria-label="Fechar"><svg><use href="#i-close"/></svg></button></div>
-    <div class="drawer-body"><label class="field">Nome da prateleira <span class="required">*</span><input id="shelf-name" required maxlength="60" placeholder="Ex.: Prateleira esquerda"></label><p class="field-help">Cada prateleira tem 4 andares (A a D), 12 módulos por andar e 96 posições.</p><h3>Área clicável na foto do galpão</h3><p class="field-help">Ajustes para a foto real, em porcentagem da imagem. Na planta ilustrada, as duas prateleiras são posicionadas nas laterais automaticamente.</p><div class="form-row"><label class="field">Distância da esquerda (%)<input id="zone-x" type="number" min="0" max="95" required></label><label class="field">Distância do topo (%)<input id="zone-y" type="number" min="0" max="95" required></label></div><div class="form-row"><label class="field">Largura (%)<input id="zone-w" type="number" min="5" max="100" required></label><label class="field">Altura (%)<input id="zone-h" type="number" min="5" max="100" required></label></div><div id="zone-preview" class="zone-preview"><div id="zone-preview-box">Prateleira</div></div><p id="shelf-error" class="form-error" role="alert"></p></div>
+    <div class="drawer-body"><label class="field">Nome da prateleira <span class="required">*</span><input id="shelf-name" required maxlength="60" placeholder="Ex.: Prateleira esquerda"></label><p class="field-help">Cada prateleira tem 4 andares (A a D), 12 módulos por andar e 96 posições.</p><h3>Posição no galpão</h3><p class="field-help">Arraste a prateleira na prévia para posicionar. Ajuste a largura e a altura abaixo; os valores representam a proporção do galpão.</p><div class="form-row"><label class="field">Distância da esquerda (%)<input id="zone-x" step="0.1" type="number" min="0" max="95" required></label><label class="field">Distância do topo (%)<input id="zone-y" step="0.1" type="number" min="0" max="95" required></label></div><div class="form-row"><label class="field">Largura (%)<input id="zone-w" step="0.1" type="number" min="5" max="100" required></label><label class="field">Altura (%)<input id="zone-h" step="0.1" type="number" min="5" max="100" required></label></div><div id="zone-preview" class="zone-preview"><div id="zone-preview-box">Prateleira</div></div><p id="shelf-error" class="form-error" role="alert"></p></div>
     <div class="drawer-footer"><button type="button" class="button danger-secondary" id="delete-shelf" hidden>Excluir</button><button type="button" class="button secondary" data-close="shelf-dialog">Cancelar</button><button type="submit" class="button primary">Salvar prateleira</button></div></form>
   </dialog>
 
+  <dialog id="account-dialog" class="modal account-dialog" aria-labelledby="account-title">
+    <div class="drawer-heading"><h2 id="account-title">Sua conta</h2><button type="button" class="icon-button" data-close="account-dialog" aria-label="Fechar"><svg><use href="#i-close"/></svg></button></div>
+    <div class="drawer-body">
+      <div id="account-login"><p>Entre com sua conta Google. A edição é liberada somente para administradores.</p><button type="button" id="google-login" class="button primary"><span class="google-letter" aria-hidden="true">G</span>Entrar com Google</button></div>
+      <div id="account-profile" hidden><strong id="account-name"></strong><p id="account-email"></p><span id="account-role" class="account-role"></span><details class="account-details"><summary>Identificador da conta</summary><input id="account-uid" readonly aria-label="Identificador da conta"><button type="button" id="copy-account-id" class="button secondary">Copiar identificador</button></details><button type="button" id="legacy-import" class="button secondary" hidden>Publicar cadastros anteriores</button><button type="button" id="sign-out" class="button secondary">Sair da conta</button></div>
+      <p class="form-error" id="account-error" role="alert"></p>
+    </div>
+  </dialog>
   <dialog id="confirm-dialog" class="modal confirm-modal" aria-labelledby="confirm-title"><form method="dialog"><div class="drawer-body"><span class="confirm-icon"><svg><use href="#i-info"/></svg></span><h2 id="confirm-title">Confirmar ação</h2><p id="confirm-message"></p></div><div class="drawer-footer"><button class="button secondary" value="cancel" autofocus>Cancelar</button><button id="confirm-accept" class="button primary" value="accept">Confirmar</button></div></form></dialog>
   <input id="warehouse-photo-input" type="file" accept="image/jpeg,image/png,image/webp" hidden>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

@@ -109,3 +109,16 @@ test("ampliação preserva cadastros antigos e aceita o último par de 12 módul
   assert.throws(() => M.placeItem(shelf, item({id: "bad", start: 25})), /Posição/);
 });
 
+
+test("fotos aceitam Storage do projeto e rejeitam outras origens", () => {
+  const state = M.defaultState();
+  const url = 'https://firebasestorage.googleapis.com/v0/b/almox.firebasestorage.app/o/almox%2Ffoto.jpg?alt=media&token=teste';
+  globalThis.ALMOX_FIREBASE_CONFIG = {storageBucket:'almox.firebasestorage.app'};
+  try {
+    state.warehousePhoto=url;
+    assert.equal(M.validateState(state).warehousePhoto,url);
+    for (const invalid of [url.replace('almox.firebasestorage.app','outro-bucket'), url.replace('https:', 'http:'),url.replace('firebasestorage.googleapis.com','example.com'),url.replace('/almox%2F','/privado%2F'),'javascript:alert(1)']) {
+      state.warehousePhoto=invalid;assert.throws(()=>M.validateState(state),/foto/i);
+    }
+  } finally {delete globalThis.ALMOX_FIREBASE_CONFIG;}
+});
